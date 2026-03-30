@@ -1,0 +1,15 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Data - too large for git
+src/data/
+
+# Vector database
+src/data/database/chroma_db/

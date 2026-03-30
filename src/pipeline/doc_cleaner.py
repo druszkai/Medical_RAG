@@ -50,9 +50,10 @@ def clean_data(input_path, output_path):
 
 if __name__ == "__main__":
     docs = [
-        "pubmed_1000_en.json",
-        "webmd_formatted_articles.json",
-        "cleaned_data_en_hu.json",
+        #"pubmed_1000_en.json",
+        #"webmd_formatted_articles.json",
+        #"cleaned_data_en_hu.json",
+        "scraped_articles.json",
     ]
     for doc in docs:
         clean_data(RAW_DATA_DIR / doc, PROCESSED_DATA_DIR / doc)

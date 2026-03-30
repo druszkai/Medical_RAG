@@ -1,60 +1,89 @@
-"""This script serves as a skeleton template for synchronous AgentQL scripts."""
-
+import json
 import logging
 
 import agentql
 from agentql.ext.playwright.sync_api import Page
 from playwright.sync_api import sync_playwright
 
-# Set up logging
+from src.config import *
+from src.scrapers.urls import AHA, DRAXE, EVERYDAYHEALTH, HEALTHLINE, MAYO_CLINIC, MNT, NIH, VERYWELL, WEBMD
+
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
-# Set the URL to the desired website
-URLs = ["https://www.webmd.com/heart-disease/guide-chapter-heart-disease-appointment-prep",
-        "https://www.webmd.com/heart-disease/cad",
-        "https://www.webmd.com/heart-disease/pad",
-        "https://www.webmd.com/hypertension-high-blood-pressure/default.htm",
-        "https://www.webmd.com/hypertension-high-blood-pressure/guide-chapter-hypertension-overview",
-        "https://www.webmd.com/heart/default.htm",
-        "https://www.webmd.com/heart-disease/atrial-fibrillation/default.htm",
-        "https://www.webmd.com/cholesterol-management/default.htm",
-        "https://www.webmd.com/heart/metabolic-syndrome/default.htm",
-        "https://www.webmd.com/hypertension-high-blood-pressure/guide-chapter-hypertension-symptoms-types",
-        "https://www.webmd.com/hypertension-high-blood-pressure/guide-chapter-hypertension-tests-diagnosis",
-        "https://www.webmd.com/hypertension-high-blood-pressure/guide-chapter-hypertension-treatment-care",
-        "https://www.webmd.com/hypertension-high-blood-pressure/guide-chapter-hypertension-living-with",
-        "https://www.webmd.com/hypertension-high-blood-pressure/guide-chapter-hypertension-support-resources",
-        ]
+OUTPUT_FILE = RAW_DATA_DIR / "scraped_articles.json"
+
+ALL_URLS = {
+    "Healthline": HEALTHLINE,
+    "WebMD": WEBMD,
+    "MayoClinic": MAYO_CLINIC,
+    "AHA": AHA,
+    "MedicalNewsToday": MNT,
+    "VerywellHealth": VERYWELL,
+    "DrAxe": DRAXE,
+    "NIH": NIH,
+    "EverydayHealth": EVERYDAYHEALTH,
+}
+
+QUERY = """
+{
+  article {
+    title
+    text
+    description
+  }
+}
+"""
+
+
+def is_valid(response):
+    article = response.get("article", {})
+    if not article:
+        return False
+    title = article.get("title", "").strip()
+    text = article.get("text", "").strip()
+    return bool(title) and len(text) > 200
+
+
+def scrape_page(page: Page, url: str, source: str):
+    try:
+        page.goto(url, timeout=30000)
+        response = page.query_data(QUERY)
+        if is_valid(response):
+            article = response["article"]
+            return {
+                "document_id": url,
+                "source": source,
+                "language": "en",
+                "title": article["title"].strip(),
+                "text": article["text"].strip(),
+            }
+        else:
+            log.info(f"Skipped (empty/short): {url}")
+            return None
+    except Exception as e:
+        log.warning(f"Failed: {url} — {e}")
+        return None
 
 
 def main():
-    for URL in URLs:
-        with sync_playwright() as p, p.chromium.launch(headless=False) as browser:
-            # Create a new page in the browser and wrap it to get access to the AgentQL's querying API
-            page = agentql.wrap(browser.new_page())
+    results = []
 
-            # Navigate to the desired URL
-            page.goto(URL)
+    with sync_playwright() as p, p.chromium.launch(headless=False) as browser:
+        page = agentql.wrap(browser.new_page())
 
-            get_response(page)
+        for source, urls in ALL_URLS.items():
+            log.info(f"\nScraping {source} ({len(urls)} URLs)...")
+            for url in urls:
+                result = scrape_page(page, url, source)
+                if result:
+                    results.append(result)
+                    log.info(f"  Saved: {result['title']}")
 
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=4)
 
-def get_response(page: Page):
-    query = """
-{
-  publications[] {
-    title
-    description
-    link
-  }
-}
-    """
-
-    response = page.query_data(query)
-
-    # For more details on how to consume the response, refer to the documentation at https://docs.agentql.com/intro/main-concepts
-    print(response)
+    print(f"\nDone. Saved {len(results)} articles to {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

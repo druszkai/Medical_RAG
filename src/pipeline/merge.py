@@ -32,6 +32,7 @@ if __name__ == "__main__":
         "cleaned_data_en_hu.json",
         "pubmed_1000_en.json",
         "webmd_formatted_articles.json",
+        "scraped_articles.json",
     ]
     output_filename = "all_merged_articles.json"
 

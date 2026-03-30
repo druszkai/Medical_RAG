@@ -4,8 +4,7 @@ import json
 import time
 from Bio import Entrez
 
-# Ne felejtsd el beállítani a saját email címedet!
-Entrez.email = "ide_ird_az_emailedet@sajat_domain.hu"
+Entrez.email = "email_asd@dom_domain.com"
 
 
 def fetch_pubmed_data_formatted(max_results=1200):

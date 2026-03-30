@@ -11,12 +11,10 @@ AGENTQL_API_KEY = os.environ["AGENTQL_API_KEY"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 # Paths
-PY_DIR = Path(__file__).parent
-AGENTS_DIR = PY_DIR / "agents"
-SCRAPERS_DIR = PY_DIR / "scrapers"
-TOOLS_DIR = PY_DIR / "tools"
-
-SRC_DIR = PY_DIR.parent
+SRC_DIR = Path(__file__).parent
+AGENTS_DIR = SRC_DIR / "agentic_logic"
+SCRAPERS_DIR = SRC_DIR / "scrapers"
+TOOLS_DIR = SRC_DIR / "tools"
 
 DATA_DIR = SRC_DIR / "data"
 DATABASE_DIR = DATA_DIR / "database"
@@ -38,3 +36,11 @@ LLM_LLAMA_3_3_70B_VERSATILE = "llama-3.3-70b-versatile"
 LLM_PHI_3 = "phi3"
 LLM_OPENAI_GTP_OSS_20B = "openai/gpt-oss-20b"
 LLM_OPENAI_GPT_OSS_120B = "openai/gpt-oss-120b"
+LLM_OPENAI_GPT_5_MINI = "gpt-5-mini"
+LLM_OPENAI_GPT_5 = "gpt-5"
+LLM_OPENAI_GPT_4O_MINI = "gpt-4o-mini"
+LLM_OPENAI_GPT_4O = "gpt-4o"
+
+if __name__ == "__main__":
+    load_dotenv()
+    print(os.getenv("OPENAI_API_KEY"))
