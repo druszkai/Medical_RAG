@@ -8,6 +8,7 @@ from langchain_openai import ChatOpenAI
 from sentence_transformers import CrossEncoder
 
 from src.config import OPENAI_API_KEY, LLM_OPENAI_GPT_4O_MINI
+from src.ontology.concept_graph import ConceptGraph
 
 RRF_K = 60
 QUERY_WEIGHT = 0.6
@@ -100,6 +101,8 @@ class Retriever:
 
         self.hyde_chain = HYDE_PROMPT | fast_llm
 
+        self.concept_graph = ConceptGraph()
+
 
     def retrieve_standard(self, query: str, keywords: str) -> Sequence[Document]:
         if keywords:
@@ -188,3 +191,26 @@ class Retriever:
         hypothetical_doc = self.hyde_chain.invoke({"input": query}).content.strip()
         docs = self.vector_store.similarity_search(hypothetical_doc, k=self.top_k)
         return self.reranker.rerank_weighted(query, keywords, docs)
+
+    def retrieve_hierarchical(self, query: str, keywords: str, max_level: int = 2) -> tuple[Sequence[Document], int]:
+        raw_concepts = self.concept_chain.invoke({"input": query}).content.strip()
+        entities = raw_concepts.split()
+
+        nodes = self.concept_graph.build_concept_graph(entities)
+        levels = self.concept_graph.get_levels(nodes)
+
+        for level_idx in range(max_level + 1):
+            if level_idx not in levels:
+                continue
+
+            level_terms = " ".join(levels[level_idx])
+            search_query = f"{query}\n{keywords}\n{level_terms}"
+
+            docs = self.vector_store.similarity_search(search_query, k=self.top_k)
+            reranked = self.reranker.rerank(query, keywords, docs)
+
+            if reranked:
+                return reranked, level_idx
+
+        return [], -1
+

@@ -1,5 +1,6 @@
 import sys
 import asyncio
+from typing import Any
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -84,6 +85,16 @@ def run_rag(agent: MedicalRAG, question: str) -> tuple[str, list[str]]:
     contexts = [doc.page_content for doc in docs]
 
     return answer, contexts
+
+def run_rag_hierarchical(agent: MedicalRAG, question: str) -> tuple[Any, list[Any], Any]:
+    keywords = agent.keyword_chain.invoke({"input": question,}).content
+    docs, level_used = agent.retriever.retrieve_hierarchical(question, keywords)
+    answer = agent.qa_chain.invoke({
+        "contex": docs,
+        "input": question,
+        "keywords": keywords,
+    })
+    return answer, [doc.page_content for doc in docs], level_used
 
 def df_to_samples(df: pd.DataFrame, agent: MedicalRAG) -> list[SingleTurnSample]:
     samples = []
