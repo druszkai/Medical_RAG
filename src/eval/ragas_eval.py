@@ -90,7 +90,7 @@ def run_rag_hierarchical(agent: MedicalRAG, question: str) -> tuple[Any, list[An
     keywords = agent.keyword_chain.invoke({"input": question,}).content
     docs, level_used = agent.retriever.retrieve_hierarchical(question, keywords)
     answer = agent.qa_chain.invoke({
-        "contex": docs,
+        "context": docs,
         "input": question,
         "keywords": keywords,
     })

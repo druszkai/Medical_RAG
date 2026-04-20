@@ -57,6 +57,17 @@ Use the search tool to find relevant information. If the first result is inadequ
 Always base your final answer strictly on what the tool returns. Never use outside knowledge.
 Respond in the same language as the question."""
 
+NER_PROMPT = """
+You are an expert medical entity extractor. Extract the core medical concepts from the user's text.
+Focus ONLY on:
+1. Diseases & Symptoms (e.g., headache, hypertension)
+2. Medications & Active Ingredients (e.g., aspirin, lisinopril)
+3. Herbs & Supplements (e.g., ginkgo biloba, vitamin D)
+
+Return the output as a clean JSON list of strings, translated to English clinical terms if possible.
+Example input: "Fáj a fejem és ginkgot szedek"
+Example output: ["headache", "ginkgo biloba"]
+"""
 
 class MedicalRAG:
     def __init__(self):

@@ -9,7 +9,6 @@ class ConceptNode:
     rxcui: str | None = None
     synonyms: list[str] = field(default_factory=list)
     parent_terms: list[str] = field(default_factory=list)
-    level: int = 0 # 0 - eredeti, 1 - szinonima, 2 - szülő, 3 - nagyszülő
 
 class ConceptGraph:
     def __init__(self):
@@ -20,7 +19,7 @@ class ConceptGraph:
         """Build concept graph"""
         nodes: list[ConceptNode] = []
         for entity in entities:
-            node = ConceptNode(term=entity, level=0)
+            node = ConceptNode(term=entity)
 
             descriptor = self.mesh.find_descriptor(entity)
             if descriptor:
@@ -44,3 +43,22 @@ class ConceptGraph:
             levels[1].extend(node.synonyms)
             levels[2].extend(node.parent_terms)
         return {k: list(set(v)) for k, v in levels.items() if v}
+
+if __name__ == "__main__":
+    graph = ConceptGraph()
+
+    entities = ["hypertension", "ginkgo biloba"]
+    print(f"ConceptGraph test: {entities}")
+
+    nodes = graph.build_concept_graph(entities)
+    for node in nodes:
+        print(f"\tEntity: {node.term}")
+        print(f"\tMeSH UI : {node.mesh_ui}")
+        print(f"\tRxCUI   : {node.rxcui}")
+        print(f"\tSynonyms ({len(node.synonyms)}): {node.synonyms[:5]}")
+        print(f"\tParents  : {node.parent_terms}")
+
+    levels = graph.get_levels(nodes)
+    print("Expansion levels\n")
+    for level, terms in levels.items():
+        print(f"  L{level}: {terms[:5]}")
