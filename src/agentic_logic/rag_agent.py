@@ -11,6 +11,7 @@ from langchain.agents import create_agent
 #from langchain_community.document_transformers import LongContextReorder
 
 from src.agentic_logic.retrieval_logic import Retriever, Reranker
+from src.agentic_logic.kge_chain import KGEChain
 from src.config import *
 
 REFUSAL_MSG = "A rendelkezésemre álló információk alapján nem tudok válaszolni"
@@ -115,6 +116,10 @@ class MedicalRAG:
         )
 
         self.critic_chain = CRITIC_PROMPT | critic_llm
+
+        # KGEChain builds a concept graph from retrieved chunks and uses it
+        # to guide synthesis — only instantiated once, reused across queries
+        self.kge_chain = KGEChain()
 
         self._agent = self._build_agent()
 
@@ -300,8 +305,44 @@ class MedicalRAG:
             return f"Hiba történt a lekérdezés során: {str(e)}", []
 
 
+    def query_kge(self, query_str: str) -> tuple[str, Sequence[Document], dict]:
+        """KGE-enriched RAG query.
+
+        Flow:
+          1. Retrieve docs with HyDE (same as query_combined)
+          2. KGEChain extracts entity pairs from each chunk and builds a graph
+          3. Finds the shortest conceptual path between the two anchor entities
+          4. Synthesizes a final answer using both the graph context and raw docs
+
+        Returns the answer, the retrieved docs, and KGE metadata
+        (path, graph_size, relations) for logging during eval.
+        """
+        try:
+            keywords = self.keyword_chain.invoke({"input": query_str}).content
+            # HyDE retrieval: generates a hypothetical answer first, embeds it,
+            # then searches and gives semantically richer results for mechanism questions
+            docs = self.retriever.retrieve_with_hyde(query_str, keywords)
+
+            # KGEChain makes one LLM call per chunk (relation extraction) + two more
+            # for anchor extraction and synthesis — expect ~10 calls total for top_k=8
+            result = self.kge_chain.run(query_str, docs)
+
+            kge_meta = {
+                "path": result["path"],             # conceptual chain found in the graph
+                "graph_size": result["graph_size"], # how many unique entities were extracted
+                "relations": result["relations"],   # all entity pairs found across chunks
+            }
+
+            self._print_sources(docs)
+            return result["answer"], docs, kge_meta
+
+        except Exception as e:
+            return f"Hiba történt a lekérdezés során: {str(e)}", [], {}
+
+
 if __name__ == "__main__":
     agent = MedicalRAG()
     test_query = "Mit tudsz az akutt agyi infarktusról?"
     print(agent.query_iterative(test_query))
+    print(agent.query_kge(test_query))
     #print(agent.query(test_query))
