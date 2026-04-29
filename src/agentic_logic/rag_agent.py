@@ -319,12 +319,7 @@ class MedicalRAG:
         """
         try:
             keywords = self.keyword_chain.invoke({"input": query_str}).content
-            # HyDE retrieval: generates a hypothetical answer first, embeds it,
-            # then searches and gives semantically richer results for mechanism questions
             docs = self.retriever.retrieve_with_hyde(query_str, keywords)
-
-            # KGEChain makes one LLM call per chunk (relation extraction) + two more
-            # for anchor extraction and synthesis — expect ~10 calls total for top_k=8
             result = self.kge_chain.run(query_str, docs)
 
             kge_meta = {
