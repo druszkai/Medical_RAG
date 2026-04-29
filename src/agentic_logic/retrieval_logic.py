@@ -14,6 +14,9 @@ RRF_K = 60
 QUERY_WEIGHT = 0.6
 KEYWORD_WEIGHT = 0.4
 
+LAYPERSON_SOURCES = {"webmd", "healthline", "draxe", "verywellhealth", "medicalnewstoday"}
+LAYPERSON_BOOST = 0.15
+
 CONCEPT_PROMPT = ChatPromptTemplate.from_messages([("system", """
 You are an expert medical librarian. Extract structured concepts from the question below.
 Include BOTH clinical terminology AND natural/lifestyle equivalents where relevant.
@@ -69,6 +72,30 @@ class Reranker:
         pairs = [[query, doc.page_content] for doc in docs]
         scores = self.model.predict(pairs)
         ranked = sorted(zip(scores, docs), key = lambda x: x[0], reverse = True)
+        return [doc for _, doc in ranked][:self.top_k]
+
+    def rerank_layperson(self, query: str, keywords: str, docs: list[Document]) -> Sequence[Document]:
+        """Weighted reranking with a score boost for layperson-sourced documents.
+
+        Works identically to rerank_weighted, but after computing cross-encoder
+        scores it adds LAYPERSON_BOOST to any doc whose source metadata matches
+        a known general-audiences site. Clinical docs are still returned as fallback
+        if they score much higher (like a rare term only found in PubMed).
+        """
+        query_pairs = [[query, doc.page_content] for doc in docs]
+        keyword_pairs = [[keywords, doc.page_content] for doc in docs] if keywords else query_pairs
+
+        query_scores = np.array(self.model.predict(query_pairs))
+        keyword_scores = np.array(self.model.predict(keyword_pairs)) if keywords else query_scores
+
+        combined = QUERY_WEIGHT * query_scores + KEYWORD_WEIGHT * keyword_scores
+
+        for i, doc in enumerate(docs):
+            source = doc.metadata.get("source", "").lower()
+            if any(s in source for s in LAYPERSON_SOURCES):
+                combined[i] += LAYPERSON_BOOST
+
+        ranked = sorted(zip(combined, docs), key=lambda x: x[0], reverse=True)
         return [doc for _, doc in ranked][:self.top_k]
 
     def rerank_weighted(self, query: str, keywords: str, docs: list[Document]) -> Sequence[Document]:
@@ -191,6 +218,17 @@ class Retriever:
         hypothetical_doc = self.hyde_chain.invoke({"input": query}).content.strip()
         docs = self.vector_store.similarity_search(hypothetical_doc, k=self.top_k)
         return self.reranker.rerank_weighted(query, keywords, docs)
+
+    def retrieve_layperson(self, entity: str) -> Sequence[Document]:
+        """Single-entity retrieval made for layperson-friendly results (UC1).
+
+        Uses the entity name directly as the search query — no HyDE, no keyword
+        expansion. For a single medical term, the term itself is the best query.
+        Applies layperson source boosting so WebMD/Healthline/etc. rank higher
+        than clinical abstracts when relevance is comparable.
+        """
+        docs = self.vector_store.similarity_search(entity, k=self.top_k)
+        return self.reranker.rerank_layperson(entity, "", docs)
 
     def retrieve_hierarchical(self, query: str, keywords: str, max_level: int = 2) -> tuple[Sequence[Document], int]:
         raw_concepts = self.concept_chain.invoke({"input": query}).content.strip()
