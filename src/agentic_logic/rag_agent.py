@@ -118,22 +118,21 @@ class MedicalRAG:
         self.critic_chain = CRITIC_PROMPT | critic_llm
 
         # KGEChain builds a concept graph from retrieved chunks and uses it
-        # to guide synthesis — only instantiated once, reused across queries
+        # to guide synthesis only instantiated once, reused across queries
         self.kge_chain = KGEChain()
 
         self._agent = self._build_agent()
 
     def _build_agent(self):
-        rag = self
         @tool
         def search_medical_database(query: str) -> str:
             """Search the medical knowledge base for information relevant to the query.
             Use this for questions about cardiovascular health, symptoms, treatments,
             natural remedies, and lifestyle advice."""
             keywords = self.keyword_chain.invoke({"input": query}).content
-            docs = rag.retriever.retrieve_concepts_weighted(query, keywords)
-            rag._print_sources(docs)
-            return rag.qa_chain.invoke({
+            docs = self.retriever.retrieve_concepts_weighted(query, keywords)
+            self._print_sources(docs)
+            return self.qa_chain.invoke({
                 "context": docs,
                 "input": query,
                 "keywords": keywords,
