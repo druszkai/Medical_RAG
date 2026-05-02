@@ -146,7 +146,7 @@ class TermAnnotator:
             "glossary": glossary,
         }).content.strip()
 
-    def _extract_entities(self, text: str) -> list[str]:
+    def extract_entities(self, text: str) -> list[str]:
         """Calls NER chain and parses the JSON result."""
         raw = self.ner_chain.invoke({"text": text}).content.strip()
         try:
